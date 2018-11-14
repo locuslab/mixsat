@@ -1,0 +1,13 @@
+The directory contains the source code for the MIXSAT solvers:
+
+complete.c: The MIXSAT solver for complete track, will output solutions only after verification.
+
+incomplete.c: The MIXSAT solver for incomplete track, output solutions once immediately without verification.
+
+To compile the code, please type
+	$ make
+
+The solvers can solve any unweighted DIMACS CNF file by
+	$ ./complete FILE
+	or
+	$ ./incomplete FILE
