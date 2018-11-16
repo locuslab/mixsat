@@ -443,7 +443,7 @@ int path_len(path_t *self, lit_t node)
     return len;
 }
 
-void path_to_lit(path_t *src, lit_t node, lit_t *dst, int recursive)
+int path_to_lit(path_t *src, lit_t node, lit_t *dst, int recursive)
 {
     lit_t *orig_dst = dst, len;
 
@@ -459,9 +459,11 @@ void path_to_lit(path_t *src, lit_t node, lit_t *dst, int recursive)
     }
 
     // reverse
+    len = dst-orig_dst;
     dst--;
     for (lit_t t; orig_dst < dst; orig_dst++, dst--)
         t = *dst, *dst = *orig_dst, *orig_dst = t;
+    return len;
 }
 
 void path_move(path_t *self, int is_forward, lit_t b)
@@ -606,6 +608,8 @@ wstack_t *wstack_commit(wstack_t *w, mixsat_t *mix)
         .cls =     Calloc(m+1, sizeof *self->cls),
         .watched = Calloc((n+1)*2, sizeof *self->watched),
     };
+    for (int i=1; i<=n; i++) self->pivot[i] = i<<1;
+
 
     // decide order
     lit_t *perm = mix->perm, *order = mix->order;
@@ -649,7 +653,7 @@ wstack_t *wstack_commit(wstack_t *w, mixsat_t *mix)
     return self;
 }
 
-int maxsat_rounding(mixsat_t *mix, wstack_t *w, int n_trial, int *best, lit_t *best_sol, int64_t time_st)
+int maxsat_rounding(mixsat_t *mix, wstack_t *w, int n_trial, int *best, lit_t *best_sol, int64_t time_st, lit_t node, int n_total)
 {
     int n = mix->n, k = mix->k;
     float **V = mix->V, *r = mix->Z[0];
@@ -673,6 +677,13 @@ int maxsat_rounding(mixsat_t *mix, wstack_t *w, int n_trial, int *best, lit_t *b
         }
         if (*best > w->curr) {
             *best = w->curr;
+            memcpy(best_sol+1, pivot+1, n * sizeof *sol);
+            path_to_lit(w->path->parent, node, best_sol+n+1, 1);
+
+            for(lit_t *p=best_sol+1; p<=best_sol+n_total; p++)
+                printf("%c%u ", (*p&1)?'+':'-', *p>>1);
+            printf("\n");
+
             printf("best %d time %fs\n", 
                     *best, wall_time_diff(wall_clock_ns(), time_st));
             fflush(stdout);
@@ -1091,7 +1102,7 @@ int bin_maxsat(SATProblem prob, Parameter *param)
 
         wstack_t *w = wstack_commit(h.parent, mix);
         wstack_move(h.parent, h.node, BACKTRACK); 
-        maxsat_rounding(mix, w, sqrt(w->n)*(w->n==n?500:1), &best, best_sol, time_st);
+        maxsat_rounding(mix, w, sqrt(w->n)*(w->n==n?500:1), &best, best_sol, time_st, h.node, n);
 
         for (int from_parent=1, depth=1; depth; n_visited++) {
             int action;
